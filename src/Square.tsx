@@ -10,8 +10,8 @@ function Square(props: {
     <div
       className={`square ${
         props.x
-          ? `${props.winner === "x" ? "xwin" : "x"}`
-          : `${props.o ? `${props.winner === "o" ? "owin" : "o"}` : ""}`
+          ? `${props.winner === "x" && props.isWinning ? "xwin" : "x"}`
+          : `${props.o ? `${props.winner === "o" && props.isWinning ? "owin" : "o"}` : ""}`
       } ${
         props.isWinning && props.winner === "x"
           ? "win"

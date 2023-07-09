@@ -23,6 +23,7 @@ function Board() {
     cpuWins: 0,
     ties: 0,
   });
+  const [lastMove, setLastMove] = useState<number | null>(null);
 
   function checkWin() {
     for (let i = 0; i < lines.length; i++) {
@@ -83,6 +84,7 @@ function Board() {
     if (winner) {
       return;
     }
+
     const newSquares = squares.slice();
     newSquares[index] = "o";
     setSquares(newSquares);
@@ -113,6 +115,71 @@ function Board() {
     });
   };
 
+  function getLinesContaining(squareIndex: number): number[][] {
+    const row: number = Math.floor(squareIndex / 3);
+    const col: number = squareIndex % 3;
+
+    const horizontalLine: number[] = [row * 3, row * 3 + 1, row * 3 + 2];
+    const verticalLine: number[] = [col, col + 3, col + 6];
+    const diagonalLine1: number[] = [0, 4, 8];
+    const diagonalLine2: number[] = [2, 4, 6];
+
+    return [horizontalLine, verticalLine, diagonalLine1, diagonalLine2].filter(
+      (line: number[]) => line.includes(squareIndex)
+    );
+  }
+
+  type Mark = "x" | "o";
+
+  function checkForks(squares: SquareValue[]): number[] {
+    const player: Mark = "o";
+    const opponent: Mark = "x";
+    // @ts-ignore
+    const emptySquares: number[] = squares.filter(
+      // @ts-ignore
+      (index: number) => squares[index] === null
+    );
+    const forks: number[] = [];
+
+    for (let i = 0; i < emptySquares.length; i++) {
+      const squareIndex: number = emptySquares[i];
+      squares[squareIndex] = player;
+
+      const lines: number[][] = getLinesContaining(squareIndex).filter(
+        (line: number[]) =>
+          line.filter((index: number) => squares[index] === opponent).length ===
+          1
+      );
+
+      for (let j = 0; j < lines.length; j++) {
+        const line: number[] = lines[j];
+        const emptyIndex: number = line.filter(
+          (index: number) => squares[index] === null
+        )[0];
+
+        squares[emptyIndex] = player;
+
+        const forksInLine: number[] = getLinesContaining(emptyIndex).filter(
+          (forkLine: number[]) =>
+            forkLine.filter((index: number) => squares[index] === opponent)
+              .length === 1 &&
+            forkLine.filter((index: number) => squares[index] === player)
+              .length === 0
+        )[0];
+
+        if (forksInLine) {
+          forks.push(emptyIndex);
+        }
+
+        squares[emptyIndex] = null;
+      }
+
+      squares[squareIndex] = null;
+    }
+
+    return forks;
+  }
+
   useEffect(() => {
     if (isComputerTurn) {
       const winningLines = linesThatAre("o", "o", null);
@@ -141,29 +208,51 @@ function Board() {
         return;
       }
 
+      const forks = checkForks(squares);
+      if (forks.length > 0) {
+        putComputerAt(forks[0]);
+        return;
+      }
+
       const emptyIndexes = squares
         .map((square, index) => (square === null ? index : null))
         .filter((val) => val !== null);
 
-      const randomIndex =
-        emptyIndexes[Math.floor(Math.random() * emptyIndexes.length)];
-      putComputerAt(randomIndex);
+      let randomIndex;
+
+      if (lastMove === 4) {
+        // Player's last move is center
+        const corners = [0, 2, 6, 8];
+        randomIndex = corners[Math.floor(Math.random() * corners.length)];
+        // @ts-ignore
+      } else if ([0, 2, 6, 8].includes(lastMove)) {
+        // Player's last move is a corner
+        randomIndex = 4;
+      } else {
+        // Player's last move is an edge
+        const adjacentCorners = {
+          1: [0, 2],
+          3: [0, 6],
+          5: [2, 8],
+          7: [6, 8],
+        };
+        const cornerIndex =
+          // @ts-ignore
+          adjacentCorners[lastMove][Math.floor(Math.random() * 2)];
+        randomIndex = cornerIndex;
+      }
+
+      // Check if the chosen index is empty
+      if (emptyIndexes.includes(randomIndex)) {
+        putComputerAt(randomIndex);
+      } else {
+        // Choose a new random index if the first one is not empty
+        const newRandomIndex =
+          emptyIndexes[Math.floor(Math.random() * emptyIndexes.length)];
+        putComputerAt(newRandomIndex);
+      }
     }
   }, [squares, isComputerTurn]);
-
-  // useEffect(() => {
-  //   const playerWon = linesThatAre("x", "x", "x").length > 0;
-
-  //   const computerWon = linesThatAre("o", "o", "o").length > 0;
-  //   if (playerWon) {
-  //     setWinner("x");
-  //     setWins((prev) => ({ ...prev, playerWins: prev.playerWins + 1 }));
-  //   }
-  //   if (computerWon) {
-  //     setWinner("o");
-  //     setWins((prev) => ({ ...prev, cpuWins: prev.cpuWins + 1 }));
-  //   }
-  // }, [squares]);
 
   function handleSquareClick(index: number) {
     if (squares[index] !== null || winner) {
@@ -172,6 +261,7 @@ function Board() {
     const newSquares = squares.slice();
     newSquares[index] = "x";
     setSquares(newSquares);
+    setLastMove(index);
 
     if (calculateWinner(newSquares) === "x") {
       setWins((prev) => ({ ...prev, playerWins: prev.playerWins + 1 }));
@@ -204,7 +294,6 @@ function Board() {
   const winningSquares = calculateWinningIndex(squares)
     ? calculateWinningIndex(squares)
     : [];
-  // console.log(winningSquares);
 
   return (
     <div>
